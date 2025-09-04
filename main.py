@@ -1,7 +1,9 @@
+import functions_framework
 import json  # built-in
+from flask import jsonify, Request
 from jsonschema import validate, ValidationError
 
-# Define schema globally (or load from a .json file)
+# Define schema globally (better performance than redefining in each call)
 schema = {
     "$id": "https://example.com/address.schema.json",
     "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -24,29 +26,20 @@ schema = {
 }
 
 
-def validate_address(data: dict) -> bool:
+@functions_framework.http
+def validate_address(request: Request):
     """
-    Validate an address JSON against the schema.
-    Returns True if valid, raises ValidationError if not.
+    Cloud Function entry point.
+    Expects JSON in the request body and validates it against the schema.
     """
     try:
+        data = request.get_json(silent=True)
+        if data is None:
+            return jsonify({"status": "error", "message": "Invalid or missing JSON"}), 400
+
+        # Validate against schema
         validate(instance=data, schema=schema)
-        print("✅ JSON is valid")
-        return True
+        return jsonify({"status": "success", "message": "JSON is valid"}), 200
+
     except ValidationError as e:
-        print("❌ JSON validation error:", e.message)
-        return False
-
-
-# # Example usage
-# if __name__ == "__main__":
-#     incoming_json = {
-#         "postOfficeBox": "123",
-#         "streetAddress": "456 Main St",
-#         "locality": "Cityville",
-#         "region": "State",
-#         "postalCode": "12345",
-#         "countryName": "Country"
-#     }
-
-#     validate_address(incoming_json)
+        return jsonify({"status": "error", "message": e.message}), 400
